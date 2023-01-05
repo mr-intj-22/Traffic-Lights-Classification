@@ -1,0 +1,14 @@
+--index-url https://pypi.tuna.tsinghua.edu.cn/simple
+
+contourpy==1.0.6 ; python_version >= "3.9" and python_version < "3.12"
+cycler==0.11.0 ; python_version >= "3.9" and python_version < "3.12"
+fonttools==4.38.0 ; python_version >= "3.9" and python_version < "3.12"
+kiwisolver==1.4.4 ; python_version >= "3.9" and python_version < "3.12"
+matplotlib==3.6.2 ; python_version >= "3.9" and python_version < "3.12"
+numpy==1.24.1 ; python_version < "3.12" and python_version >= "3.9"
+opencv-python==4.5.5.64 ; python_version >= "3.9" and python_version < "3.12"
+packaging==22.0 ; python_version >= "3.9" and python_version < "3.12"
+pillow==9.4.0 ; python_version >= "3.9" and python_version < "3.12"
+pyparsing==3.0.9 ; python_version >= "3.9" and python_version < "3.12"
+python-dateutil==2.8.2 ; python_version >= "3.9" and python_version < "3.12"
+six==1.16.0 ; python_version >= "3.9" and python_version < "3.12"
