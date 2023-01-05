@@ -16,6 +16,7 @@ python = ">=3.9, <3.12"
 numpy = "^1.24.0"
 opencv-python = "~4.5.0.0"  # PyCharm 暂不支持更高版本的代码提示，很怪
 matplotlib = "^3.6.0"
+ipykernel = "^6.19.0"  # 运行.ipynb文件的最小依赖
 
 [tool.poetry.group.dev.dependencies]
 black = "^22.12.0"
