@@ -85,7 +85,7 @@ def viz_mask(rgb_image) -> None:
     yellow_result = apply_mask(rgb_image, sat_low, val_low, YELLOW_LOWER, YELLOW_UPPER)
     green_result = apply_mask(rgb_image, sat_low, val_low, GREEN_LOWER, GREEN_UPPER)
 
-    _, ax = plt.subplots(1, 5, figsize=(20, 10))
+    _, ax = plt.subplots(1, 4, figsize=(20, 10))
     ax[0].set_title("rgb image")
     ax[0].imshow(rgb_image)
     ax[1].set_title("red result")
@@ -94,14 +94,12 @@ def viz_mask(rgb_image) -> None:
     ax[2].imshow(yellow_result)
     ax[3].set_title("green result")
     ax[3].imshow(green_result)
-    ax[4].set_title("hsv image")
-    ax[4].imshow(hsv_image)
     plt.show()
 
 
 if __name__ == "__main__":
     IMAGE_LIST = load_dataset(IMAGE_DIR_TRAINING)
-    img_red = IMAGE_LIST[0][0]
+    img_red = IMAGE_LIST[7][0]
     img_yellow = IMAGE_LIST[730][0]  # TODO 处理起始索引，根据实际情况变化
     img_green = IMAGE_LIST[800][0]
     img_test = [
@@ -110,7 +108,7 @@ if __name__ == "__main__":
         (img_green, TrafficLightColor.GREEN),
     ]
 
-    viz_load_data(IMAGE_LIST, 0, 730, 800)
-    viz_hsv(IMAGE_LIST, 0)
+    viz_load_data(IMAGE_LIST, 7, 730, 800)
+    viz_hsv(IMAGE_LIST, 7)
     for img in img_test:
         viz_mask(img[0])

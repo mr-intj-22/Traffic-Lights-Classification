@@ -30,7 +30,7 @@ def standardize_image(
     return standard_list
 
 
-def standardize_input(image: np.ndarray, width: int, height: int):
+def standardize_input(image: np.ndarray, width: int, height: int) -> np.ndarray:
     """
     辅助函数，将图像缩放到指定尺寸
     :param image: 原始图像

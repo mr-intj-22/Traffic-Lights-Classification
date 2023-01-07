@@ -8,9 +8,9 @@ import numpy as np
 
 def get_avg_value(rgb_image: np.ndarray) -> float:
     """
-    计算平均亮度
+    计算平均明度
     :param rgb_image: rgb图像
-    :return: 平均亮度
+    :return: 平均明度
     """
 
     hsv_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2HSV)
@@ -37,7 +37,7 @@ def apply_mask(
     对输入图像应用指定范围的掩膜，颜色由HSV中的上下边界确定
     :param rgb_image: 原始图像（RGB）
     :param saturation_lower: 饱和度下界
-    :param value_lower: 亮度下界
+    :param value_lower: 明度下界
     :param color_lower: 颜色下界（HSV）
     :param color_upper: 颜色上界（HSV）
     :return: 应用掩膜后的图像

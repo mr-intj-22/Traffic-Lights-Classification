@@ -34,12 +34,14 @@ def traffic_light_classification(rgb_image: np.ndarray) -> TrafficLightColor:
     yellow_result = apply_mask(rgb_image, sat_low, val_low, YELLOW_LOWER, YELLOW_UPPER)
     green_result = apply_mask(rgb_image, sat_low, val_low, GREEN_LOWER, GREEN_UPPER)
 
+    # 统计经各色掩膜处理后，剩余的非空像素数量，最多者则认为是该类图像
     sum_red = find_none_zero(red_result)
     sum_yellow = find_none_zero(yellow_result)
     sum_green = find_none_zero(green_result)
     sum_max = max(sum_red, sum_yellow, sum_green)
 
     if sum_max == 0:
+        # 灯光部分像素与周围像素太接近，识别失败
         return TrafficLightColor.UNIDENTIFIED
     elif sum_max == sum_red:
         return TrafficLightColor.RED
@@ -51,30 +53,27 @@ def traffic_light_classification(rgb_image: np.ndarray) -> TrafficLightColor:
         return TrafficLightColor.UNIDENTIFIED
 
 
-# Constructs a list of misclassified images given a list of test images and their labels
-# This will throw an assertion error if labels are not standardized(one hot encode)
-def get_misclassified_images(test_images):
+def get_misclassified_images(
+    test_images,
+) -> list[tuple[np.ndarray, TrafficLightColor, TrafficLightColor]]:
+    """
+    Constructs a list of misclassified images given a list of test images and their labels
+    :param test_images: 用于测试的图像集
+    :return: 分类错误的图像、预测标签、实际标签
+    """
+
     misclassified_images_labels = []
-    # Iterate through all the test images
-    # Classify each image  and compare to the true label
-    for image in test_images:
-        # Get true data
-        im = image[0]
-        true_label = image[1]
-        assert (
-            type(true_label) == TrafficLightColor
-        ), "This true_label is not the excepted type."
 
-        # Get predicted label from your classifier
-        predicted_label = traffic_light_classification(im)
-        assert (
-            type(predicted_label) == TrafficLightColor
-        ), "This predicted_label is not the excepted type."
+    # 遍历所有测试图像，运行图像分类，对比预测标签与实际标签
+    for image_set in test_images:
+        image, true_label = image_set
 
-        # compare true and predicted labels
+        # 执行分类算法，获取预测标签
+        predicted_label = traffic_light_classification(image)
+
         if predicted_label != true_label:
-            # if these labels are ot equal, the image  has been misclassified
-            misclassified_images_labels.append((im, predicted_label, true_label))
+            # 若两种标签不匹配，则是分类错误
+            misclassified_images_labels.append((image, predicted_label, true_label))
 
     return misclassified_images_labels
 
@@ -90,10 +89,7 @@ if __name__ == "__main__":
     total = len(standardized_train_list)
     num_correct = total - len(MISCLASSIFIED)
     accuracy = num_correct / total
-    print("Accuracy:" + str(accuracy))
     print(
-        "Number of misclassified images = "
-        + str(len(MISCLASSIFIED))
-        + " out of "
-        + str(total)
+        f"Accuracy: {accuracy*100:.2f}%\n",
+        f"Number of misclassified images = {len(MISCLASSIFIED)} out of {total}",
     )
