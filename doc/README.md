@@ -1,6 +1,9 @@
-本文档为[源项目](https://github.com/shawshany/traffic_light_classified)自述文件。
+# 交通信号灯识别
+
+本文档为[源项目](https://github.com/shawshany/traffic_light_classified)的自述文件/文档。
 
 ## 引言
+
 前面我们讲完交通标志的识别，现在我们开始尝试来实现交通信号灯的识别
 接下来我们将按照自己的思路来实现并完善整个Project.
 在这个项目中，我们使用HSV色彩空间来识别交通灯，可以改善及提高的地方：
@@ -58,14 +61,13 @@ IMAGE_LIST = load_dataset(IMAGE_DIR_TRAINING)
     35
     429
 
+## Visualize the data
 
-## Visualize the data 
 这里可视化主要实现：
+
 >* 显示图像
 >* 打印出图片的大小
 >* 打印出图片对应的标签
-
-
 
 ```python
 _,ax = plt.subplots(1,3,figsize=(5,2))
@@ -90,21 +92,22 @@ ax[2].set_title(img_green.shape,fontsize=10)
 plt.show()
 ```
 
-
 ![png](https://img-blog.csdn.net/20180515161017652?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTA2NjUyMTY=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
 
-
 ## PreProcess Data
+
 在导入了上述数据后，接下来我们需要标准化输入及输出
+
 ### Input
+
 从上图，我们可以看出，每张图片的大小并不一样，我们需要标准化输入
 将每张图图片的大小resize成相同的大小，
 因为对于分类任务来说，我们需要
 在每张图片上应用相同的算法，因此标准化图像尤其重要
+
 ### Output
+
 这里我们的标签数据是类别数据：'red','yellow','green'，因此我们可以利用[one_hot](https://machinelearningmastery.com/how-to-one-hot-encode-sequence-data-in-python/)方法将类别数据转换成数值数据
-
-
 
 ```python
 # 标准化输入图像，这里我们resize图片大小为32x32x3,这里我们也可以对图像进行裁剪、平移、旋转
@@ -148,9 +151,9 @@ def one_hot_encode(label):
 ```
 
 ## Test your code
+
 实现完了上述标准化代码后，我们需要进一步确定我们的代码是正确的，因此接下来我们可以实现一个函数来实现上述代码功能的检验
 用Python搭建自动化测试框架，我们需要组织用例以及测试执行，这里我们推荐Python的标准库——unittest。
-
 
 ```python
 import unittest
@@ -200,20 +203,17 @@ tests = Tests()
 tests.test_one_hot(one_hot_encode)
 ```
 
-
 **<span style="color:green;">Test Passed</span>**
-
-
 
 ```python
 Standardized_Train_List = standardize(IMAGE_LIST)
 ```
 
 ## Feature Extraction
+
 在这里我们将使用色彩空间、形状分析及特征构造
+
 ### RGB to HSV
-
-
 
 ```python
 #Visualize
@@ -242,17 +242,9 @@ ax[3].imshow(v, cmap='gray')
     Label [red, yellow, green]: [1, 0, 0]
 
 
-
-
-
     <matplotlib.image.AxesImage at 0x7fb49ad71f28>
 
-
-
-
 ![png](https://img-blog.csdn.net/20180515161044339?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTA2NjUyMTY=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
-
-
 
 ```python
 # create feature
@@ -316,6 +308,7 @@ def highest_sat_pixel(rgb_image):
 ```
 
 ## Test dataset
+
 接下来我们导入测试集来看看，上述方法的测试精度
 上述方法我们实现了：
 1.求平均的brightness
@@ -324,7 +317,8 @@ def highest_sat_pixel(rgb_image):
 reference [url](http://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_imgproc/py_colorspaces/py_colorspaces.html?highlight=cv2%20inrange)
 
 这里部分阈值，我们直接参考[WIKI](https://zh.wikipedia.org/wiki/HSL%E5%92%8CHSV%E8%89%B2%E5%BD%A9%E7%A9%BA%E9%97%B4)上的数据：
-![这里写图片描述](https://img-blog.csdn.net/20180515161322159?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTA2NjUyMTY=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
+![](https://img-blog.csdn.net/20180515161322159?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTA2NjUyMTY=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
+
 ```python
 def estimate_label(rgb_image,display=False):
     """
@@ -392,9 +386,9 @@ def red_green_yellow(rgb_image,display):
 ```
 
 ## Test
+
 接下来我们选择三张图片来看看测试效果
 > img_red,img_yellow,img_green
-
 
 ```python
 img_test = [(img_red,'red'),(img_yellow,'yellow'),(img_green,'green')]
@@ -406,30 +400,20 @@ for img in standardtest:
     print('True label:',img[1])
 ```
 
-
 ![png](https://img-blog.csdn.net/201805151611003?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTA2NjUyMTY=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
-
 
     Predict label : [1, 0, 0]
     True label: [1, 0, 0]
 
-
-
 ![png](https://img-blog.csdn.net/20180515161108821?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTA2NjUyMTY=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
-
 
     Predict label : [0, 1, 0]
     True label: [0, 1, 0]
 
-
-
 ![png](https://img-blog.csdn.net/2018051516111618?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTA2NjUyMTY=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
-
 
     Predict label : [0, 0, 1]
     True label: [0, 0, 1]
-
-
 
 ```python
 # Using the load_dataset function in helpers.py
@@ -447,16 +431,14 @@ random.shuffle(STANDARDIZED_TEST_LIST)
     9
     107
 
-
 ## Determine the Accuracy
+
 接下来我们来看看咱们算法在测试集上的准确率。下面我们实现的代码存储所有的被错分的图片以及它们被预测的结果及真实标签。
 这些数据被存储在MISCLASSIFIED.
 
-
-
 ```python
 # Constructs a list of misclassified images given a list of test images and their labels
-# This will throw an assertionerror if labels are not standardized(one hot encode)
+# This will throw an assertion error if labels are not standardized(one hot encode)
 def get_misclassified_images(test_images,display=False):
     misclassified_images_labels = []
     #Iterate through all the test images
@@ -484,10 +466,8 @@ total = len(STANDARDIZED_TEST_LIST)
 num_correct = total-len(MISCLASSIFIED)
 accuracy = num_correct / total
 print('Accuracy:'+str(accuracy))
-print('Number of misclassfied images = '+str(len(MISCLASSIFIED))+' out of '+str(total))
+print('Number of misclassified images = '+str(len(MISCLASSIFIED))+' out of '+str(total))
 ```
 
     Accuracy:0.9797979797979798
     Number of misclassfied images = 6 out of 297
-
-
