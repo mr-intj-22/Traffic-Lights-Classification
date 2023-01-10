@@ -1,489 +1,437 @@
-整个项目源码：[GitHub](https://github.com/shawshany/traffic_light_classified)
-# 引言
-前面我们讲完交通标志的识别，现在我们开始尝试来实现交通信号灯的识别
-接下来我们将按照自己的思路来实现并完善整个Project.
-在这个项目中，我们使用HSV色彩空间来识别交通灯，可以改善及提高的地方：
->* 可以采用Faster-RCNN或SSD来实现交通灯的识别
-# 
-首先我们第一步是导入数据，并在RGB及HSV色彩空间可视化部分数据。这里的数据，我们采用[MIT自动驾驶课程](https://selfdrivingcars.mit.edu/)的图片，
-总共三类：红绿黄，1187张图片，其中，723张红色交通灯图片，429张绿色交通灯图片，35张黄色交通灯图片。
-# 导入库
+# 基于OpenCV的交通信号灯识别
 
+> 本项目 fork 自[shawshany/traffic_light_classified](https://github.com/shawshany/traffic_light_classified)，保留其算法思想。做删去冗余部分，重写大部分代码，添加大量docstring，增强可扩展性与鲁棒性等处理。
+> 
+> 原版文档：[doc/README.md](doc/README.md)，原版代码：[src/Traffic-Light-Classfy.ipynb](src/Traffic-Light-Classfy.ipynb)。
+
+## 简介
+
+本文介绍了一种用于交通信号灯图像识别分类的算法：使用 OpenCV-Python，通过将图像转换至 HSV 色彩空间，使得其中的颜色更容易被分割，达到识别分类目的。仅运用图像处理方法，而没有使用机器学习方法。经简单调参，在测试集上可以达到98%以上的准确率。
+
+本文算法代码与图像集已全部开源至 [Github - muziing/Traffic-Lights-Classification](https://github.com/muziing/Traffic-Lights-Classification)。
+
+> 代码见本仓库 [src/traffic_light_classify](src/traffic_light_classfy) 目录, 测试图像集见 [src/traffic_light_images](src/traffic_light_images)。
+
+## HSV色彩模型简介
+
+常用的 RGB 色彩模型适合于显示系统，但颜色的改变会同时引起全部三个分量的变化，并不利于对颜色进行对比。而 HSV 色彩模型更接近于人类对彩色的感知经验，非常直观地表达颜色的色调、鲜艳程度与明暗程度，方便进行颜色的对比。
+
+HSV 通过三个部分表示彩色图像：
+
+- Hue - 色调、色相
+- Saturation - 饱和度
+- Value - 明度
+
+![HSV 圆柱](doc/images/HSV_color_solid_cylinder.png)
+
+以此圆柱体表示 HSV，圆柱体的横截面可以视为一个极坐标系，极坐标的极角表示 H,极轴长度表示 S,垂直于极坐标平面的高度方向则表示 V。不同的色相 H 表示不同的颜色，从 Hue=0° 表示红色开始，逆时针旋转一周，Hue=120° 表示绿色、Hue=240°表示蓝色等。以某个特定的 H 值，取圆柱体的半边横截面得到的矩形，水平方向表示 Saturation 饱和度，竖直方向表示 Value 明度。饱和度越高，颜色越接近光谱色，颜色越深；饱和度越低，颜色越接近白色越浅。明度越高，则颜色越明亮。
+
+## 算法设计思想
+
+有了 HSV 色彩模型，便容易实现交通信号灯图像识别分类了：色相通道可以独立地指定颜色；饱和度通道不受光照条件的影响，可以较好地识别对象边界。
+
+对于交通信号灯图片，灯光部分的饱和度明显高于其他部分，有明显的对象边界。因此可以设计计算饱和度阈值，将低于该阈值的像素全部抹去，实现提取灯光部分的效果。
+
+![将图像拆分到HSV三通道](doc/images/20230107171755.png)
+
+再加上特定颜色（红、黄、绿）、适当的明度范围，即可获得适用于该张图像的掩膜（mask）。经掩膜处理后，若图像的剩余部分仍有大量非空像素（图中非黑色部分），则可以判断为对应颜色的信号灯。
+
+![对红灯图像运用三种掩膜后的效果](doc/images/20230107171755.png)
+
+![对黄灯图像运用三种掩膜的效果](doc/images/20230107172003.png)
+
+![对绿灯图像运用三种掩膜的效果](doc/images/20230107172055.png)
+
+## 代码实现
+
+本文介绍的算法相关代码已经全部开源至[Github - muziing/Traffic-Lights-Classification](https://github.com/muziing/Traffic-Lights-Classification)。
+
+### 安装与导入第三方包
+
+使用的所有第三方包列表及详细版本信息可以参考代码仓库中的 [requirements.txt](https://github.com/muziing/Traffic-Lights-Classification/blob/master/requirements.txt) 或 [poetry.lock](https://github.com/muziing/Traffic-Lights-Classification/blob/master/poetry.lock) 文件。
 
 ```python
-# import some libs
-import cv2
-import os
+import enum  # 定义枚举值类型，实现信号灯分类标签
 import glob
-import random
+import os.path  # 与glob组合使用，批处理图像文件路径
+
+import cv2  # OpenCV, 用于图像处理
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
-%matplotlib inline
+from matplotlib import image as mpimg  # 用于读取图像文件
+from matplotlib import pyplot as plt  # 用于可视化绘图
 ```
 
+### 加载数据与添加标签
+
+数据集来源已不可考，据称来自于[MIT自动驾驶课程](https://selfdrivingcars.mit.edu/)，包含1187张交通信号灯图像，其中有723张红灯、35张黄灯与429张绿灯。注意本文并未使用机器学习方法，而直接以原数据集中的训练集作为编写、调试、测试算法性能的全集。
+
+首先定义分类标签，使用枚举值类型，包含红、黄、绿三种颜色与未识别。
 
 ```python
-# Image data directories
-IMAGE_DIR_TRAINING = "traffic_light_images/training/"
-IMAGE_DIR_TEST = "traffic_light_images/test/"
+@enum.unique
+class TrafficLightColor(enum.Enum):
+    """
+    交通灯颜色类型标签
+    注意其value为文件系统中目录名称
+    """
 
-#load data
-def load_dataset(image_dir):
-    '''
-    This function loads in images and their labels and places them in a list
-    image_dir:directions where images stored
-    '''
-    im_list =[]
-    image_types= ['red','yellow','green']
-    
-    #Iterate through each color folder
-    for im_type in image_types:
-        file_lists = glob.glob(os.path.join(image_dir,im_type,'*'))
-        print(len(file_lists))
+    RED = "red"
+    YELLOW = "yellow"
+    GREEN = "green"
+    UNIDENTIFIED = "unidentified"
+```
+
+编写代码，遍历所有图像文件，读取图像数据，与其颜色标签构成二元元组，一起保存至列表中备用。
+
+```python
+def load_dataset(image_dir: str) -> list[tuple[np.ndarray, TrafficLightColor]]:
+    """
+    加载图像数据与添加标签
+    :param image_dir: 图像目录
+    :return: image 与 label
+    """
+
+    image_list = []
+
+    # 遍历每个颜色文件夹
+    for image_type in TrafficLightColor:
+        file_lists = glob.glob(os.path.join(image_dir, image_type.value, "*"))
         for file in file_lists:
-            im = mpimg.imread(file)
-            
-            if not im is None:
-                im_list.append((im,im_type))
-    return im_list
+            try:
+                image = mpimg.imread(file)
+                image_list.append((image, image_type))
+            except UnidentifiedImageError:
+                # 若某文件无法作为图像被读取加载，则跳过
+                continue
+
+    return image_list
+
+IMAGE_DIR_TRAINING: str = "../traffic_light_images/training"
 IMAGE_LIST = load_dataset(IMAGE_DIR_TRAINING)
 ```
 
-    723
-    35
-    429
+![将读取的图像数据与真实分类标签可视化](doc/images/20230107170532.png)
 
+### 图像标准化处理
 
-# Visualize the data 
-这里可视化主要实现：
->* 显示图像
->* 打印出图片的大小
->* 打印出图片对应的标签
+由于原始图像像素尺寸不一，可以考虑添加标准化代码，使其尺寸统一。将太大的图像缩小也有利于提高速度。
 
-
+> 经实验，直接使用原始图像进行处理耗时24秒、识别错误20张图像；标注化至32\*64像素，耗时20秒、识别错误20张图像；标准化至32\*32像素，耗时10秒、识别错误21张图像；标准化至16*32像素，耗时5秒、识别错误24张图像。标准化图像尺寸（缩小）可以在精度牺牲很小的前提下明显提升运行速度，有一定意义。
 
 ```python
-_,ax = plt.subplots(1,3,figsize=(5,2))
-#red
-img_red = IMAGE_LIST[0][0]
-ax[0].imshow(img_red)
-ax[0].annotate(IMAGE_LIST[0][1],xy=(2,5),color='blue',fontsize='10')
-ax[0].axis('off')
-ax[0].set_title(img_red.shape,fontsize=10)
-#yellow
-img_yellow = IMAGE_LIST[730][0]
-ax[1].imshow(img_yellow)
-ax[1].annotate(IMAGE_LIST[730][1],xy=(2,5),color='blue',fontsize='10')
-ax[1].axis('off')
-ax[1].set_title(img_yellow.shape,fontsize=10)
-#green
-img_green = IMAGE_LIST[800][0]
-ax[2].imshow(img_green)
-ax[2].annotate(IMAGE_LIST[800][1],xy=(2,5),color='blue',fontsize='10')
-ax[2].axis('off')
-ax[2].set_title(img_green.shape,fontsize=10)
-plt.show()
-```
+def standardize_image(
+    image_list: list[tuple[np.ndarray, TrafficLightColor]],
+    width: int,
+    height: int,
+) -> list[tuple[np.ndarray, TrafficLightColor]]:
+    """
+    将带有标签的图像列表输入逐个进行标准化处理，返回处理后的图像列表
+    :param image_list: 图像与标签列表
+    :param width: 标准图像宽度
+    :param height: 标准图像高度
+    :return: 标准化的图像列表
+    """
 
-
-![png](https://img-blog.csdn.net/20180515161017652?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTA2NjUyMTY=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
-
-
-# PreProcess Data
-在导入了上述数据后，接下来我们需要标准化输入及输出
-## Input
-从上图，我们可以看出，每张图片的大小并不一样，我们需要标准化输入
-将每张图图片的大小resize成相同的大小，
-因为对于分类任务来说，我们需要
-在每张图片上应用相同的算法，因此标准化图像尤其重要
-## Output
-这里我们的标签数据是类别数据：'red','yellow','green'，因此我们可以利用[one_hot](https://machinelearningmastery.com/how-to-one-hot-encode-sequence-data-in-python/)方法将类别数据转换成数值数据
-
-
-
-```python
-# 标准化输入图像，这里我们resize图片大小为32x32x3,这里我们也可以对图像进行裁剪、平移、旋转
-def standardize(image_list):
-    '''
-    This function takes a rgb image as input and return a standardized version
-    image_list: image and label
-    '''
     standard_list = []
-    #Iterate through all the image-label pairs
+
     for item in image_list:
-        image = item[0]
-        label = item[1]
-        # Standardize the input
-        standardized_im = standardize_input(image)
-        # Standardize the output(one hot)
-        one_hot_label = one_hot_encode(label)
-        # Append the image , and it's one hot encoded label to the full ,processed list of image data
-        standard_list.append((standardized_im,one_hot_label))
+        image, label = item
+        standardized_im = standardize_input(image, width, height)  # 标准化输入
+        standard_list.append((standardized_im, label))
+
     return standard_list
 
-def standardize_input(image):
-    #Resize all images to be 32x32x3
-    standard_im = cv2.resize(image,(32,32))
-    return standard_im
 
-def one_hot_encode(label):
-    #return the correct encoded label. 
-    '''
-    # one_hot_encode("red") should return: [1, 0, 0]
-    # one_hot_encode("yellow") should return: [0, 1, 0]
-    # one_hot_encode("green") should return: [0, 0, 1]
-    '''
-    if label=='red':
-        return [1,0,0]
-    elif label=='yellow':
-        return [0,1,0]
+def standardize_input(image: np.ndarray, width: int, height: int) -> np.ndarray:
+    """
+    辅助函数，将图像缩放到指定尺寸
+    :param image: 原始图像
+    :param width: 缩放后宽度
+    :param height: 缩放后高度
+    :return: 缩放后的图像
+    """
+
+    standard_image = cv2.resize(image, (width, height))
+    return standard_image
+
+# 标准化图像尺寸
+STD_IMAGE_SIZE: tuple[int, int] = (32, 64)  # (width, height)
+standardized_train_list = standardize_image(IMAGE_LIST, *STD_IMAGE_SIZE)
+```
+
+### HSV空间下的图像处理
+
+`get_avg_saturation()` 函数用于计算图像中所有像素的平均饱和度，未来将以此为依据，设定 S 通道掩码的下界。而 `apply_mask()` 函数则为指定的颜色（范围）创建掩膜，并应用于原始图像。
+
+```python
+def get_avg_saturation(rgb_image: np.ndarray) -> float:
+    """
+    计算平均饱和度
+    :param rgb_image: rgb图像
+    :return: 平均饱和度
+    """
+
+    hsv_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2HSV)
+    s_channel = hsv_image[:, :, 1]
+    return np.average(s_channel)
+
+def apply_mask(
+    rgb_image: np.ndarray, saturation_lower, value_lower, color_lower, color_upper
+) -> np.ndarray:
+    """
+    对输入图像应用指定范围的掩膜，颜色由HSV中的上下边界确定
+    :param rgb_image: 原始图像（RGB）
+    :param saturation_lower: 饱和度下界
+    :param value_lower: 明度下界
+    :param color_lower: 颜色下界（HSV）
+    :param color_upper: 颜色上界（HSV）
+    :return: 应用掩膜后的图像
+    """
+
+    hsv_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2HSV)
+    lower = np.array([color_lower, saturation_lower, value_lower])
+    upper = np.array([color_upper, 255, 255])
+    red_mask = cv2.inRange(hsv_image, lower, upper)
+    image_result = cv2.bitwise_and(rgb_image, rgb_image, mask=red_mask)
+
+    return image_result
+```
+
+### 算法主函数
+
+算法参数设定如下：
+
+```python
+# HSV阈值控制
+SATURATION_LOWER_RATIO: float = 1.3  # 平均饱和度乘以此系数，作为饱和度下限，推荐值1.3
+VALUE_LOWER: int = 140  # 明度下限
+RED_LOWER: int = 150  # 红色色相下限
+RED_UPPER: int = 180  # 红色色相上限
+YELLOW_LOWER: int = 10  # 黄色色相下限
+YELLOW_UPPER: int = 60  # 黄色色相上限
+GREEN_LOWER: int = 70  # 绿色色相下限
+GREEN_UPPER: int = 100  # 绿色色相上限
+```
+
+算法主函数：
+
+```python
+def traffic_light_classification(rgb_image: np.ndarray) -> TrafficLightColor:
+    """
+    算法主函数，返回输入的图像对应的信号灯颜色 \n
+    算法参数（变量名全大写）需要在配置文件中设置 \n
+    :param rgb_image: rgb空间下的单张图像数据
+    :return: 信号灯颜色（枚举值）
+    """
+
+    avg_saturation = get_avg_saturation(rgb_image)  # 平均饱和度
+    sat_low = int(avg_saturation * SATURATION_LOWER_RATIO)
+    val_low = VALUE_LOWER
+
+    red_result = apply_mask(rgb_image, sat_low, val_low, RED_LOWER, RED_UPPER)
+    yellow_result = apply_mask(rgb_image, sat_low, val_low, YELLOW_LOWER, YELLOW_UPPER)
+    green_result = apply_mask(rgb_image, sat_low, val_low, GREEN_LOWER, GREEN_UPPER)
+    
+    # 统计经各色掩膜处理后，剩余的非空像素数量，最多者则认为是该类图像
+    sum_red = find_none_zero(red_result)
+    sum_yellow = find_none_zero(yellow_result)
+    sum_green = find_none_zero(green_result)
+    sum_max = max(sum_red, sum_yellow, sum_green)
+
+    if sum_max == 0:
+        # 灯光部分像素与周围像素太接近，识别失败
+        return TrafficLightColor.UNIDENTIFIED
+    elif sum_max == sum_red:
+        return TrafficLightColor.RED
+    elif sum_max == sum_yellow:
+        return TrafficLightColor.YELLOW
+    elif sum_max == sum_green:
+        return TrafficLightColor.GREEN
     else:
-        return [0,0,1]
+        return TrafficLightColor.UNIDENTIFIED
 
-```
-
-# Test your code
-实现完了上述标准化代码后，我们需要进一步确定我们的代码是正确的，因此接下来我们可以实现一个函数来实现上述代码功能的检验
-用Python搭建自动化测试框架，我们需要组织用例以及测试执行，这里我们推荐Python的标准库——unittest。
-
-
-```python
-import unittest
-from IPython.display import Markdown,display
-
-# Helper function for printing markdown text(text in color/bold/etc)
-def printmd(string):
-    display(Markdown(string))
-# Print a test falied message,given an error
-def print_fail():
-    printmd('**<span style=="color: red;">Test Failed</span>**')
-def print_pass():
-    printmd('**<span style="color:green;">Test Passed</span>**')
-# A class holding all tests
-class Tests(unittest.TestCase):
-    #Tests the 'one_hot_encode' function,which is passed in as an argument
-    def test_one_hot(self,one_hot_function):
-        #test that the generate onr-hot lables match the expected one-hot label
-        #for all three cases(red,yellow,green)
-        try:
-            self.assertEqual([1,0,0],one_hot_function('red'))
-            self.assertEqual([0,1,0],one_hot_function('yellow'))
-            self.assertEqual([0,0,1],one_hot_function('green'))
-        #enter exception
-        except self.failureException as e:
-            #print out an error message
-            print_fail()
-            print('Your function did not return the excepted one-hot label')
-            print('\n'+str(e))
-            return
-        print_pass()
-    #Test if ay misclassified images are red but mistakenly classifed as green
-    def test_red_aa_green(self,misclassified_images):
-        #Loop through each misclassified image and the labels
-        for im,predicted_label,true_label in misclassified_images:
-            #check if the iamge is one of a red light
-            if(true_label==[1,0,0]):
-                try:
-                    self.assertNotEqual(true_label,[0,1,0])
-                except self.failureException as e:
-                    print_fail()
-                    print('Warning:A red light is classified as green.')
-                    print('\n'+str(e))
-                    return
-        print_pass()
-tests = Tests()
-tests.test_one_hot(one_hot_encode)
-```
-
-
-**<span style="color:green;">Test Passed</span>**
-
-
-
-```python
-Standardized_Train_List = standardize(IMAGE_LIST)
-```
-
-# Feature Extraction
-在这里我们将使用色彩空间、形状分析及特征构造
-## RGB to HSV
-
-
-
-```python
-#Visualize
-image_num = 0
-test_im = Standardized_Train_List[image_num][0]
-test_label = Standardized_Train_List[image_num][1]
-#convert to hsv
-hsv = cv2.cvtColor(test_im, cv2.COLOR_RGB2HSV)
-# Print image label
-print('Label [red, yellow, green]: ' + str(test_label))
-h = hsv[:,:,0]
-s = hsv[:,:,1]
-v = hsv[:,:,2]
-# Plot the original image and the three channels
-_, ax = plt.subplots(1, 4, figsize=(20,10))
-ax[0].set_title('Standardized image')
-ax[0].imshow(test_im)
-ax[1].set_title('H channel')
-ax[1].imshow(h, cmap='gray')
-ax[2].set_title('S channel')
-ax[2].imshow(s, cmap='gray')
-ax[3].set_title('V channel')
-ax[3].imshow(v, cmap='gray')
-```
-
-    Label [red, yellow, green]: [1, 0, 0]
-
-
-
-
-
-    <matplotlib.image.AxesImage at 0x7fb49ad71f28>
-
-
-
-
-![png](https://img-blog.csdn.net/20180515161044339?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTA2NjUyMTY=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
-
-
-
-```python
-# create feature
-'''
-HSV即色相、饱和度、明度（英语：Hue, Saturation, Value），又称HSB，其中B即英语：Brightness。
-
-色相（H）是色彩的基本属性，就是平常所说的颜色名称，如红色、黄色等。
-饱和度（S）是指色彩的纯度，越高色彩越纯，低则逐渐变灰，取0-100%的数值。
-明度（V），亮度（L），取0-100%。
-
-'''
-def create_feature(rgb_image):
-    '''
-    Basic brightness feature
-    rgb_image : a rgb_image
-    '''
-    hsv = cv2.cvtColor(rgb_image,cv2.COLOR_RGB2HSV)
-    
-    sum_brightness = np.sum(hsv[:,:,2])
-    area = 32*32
-    avg_brightness = sum_brightness / area#Find the average
-    return avg_brightness
-
-def high_saturation_pixels(rgb_image,threshold=80):
-    '''
-    Returns average red and green content from high saturation pixels
-    Usually, the traffic light contained the highest saturation pixels in the image.
-    The threshold was experimentally determined to be 80
-    '''
-    high_sat_pixels = []
-    hsv = cv2.cvtColor(rgb,cv2.COLOR_RGB2HSV)
-    for i in range(32):
-        for j in range(32):
-            if hsv[i][j][1] > threshold:
-                high_sat_pixels.append(rgb_image[i][j])
-    if not high_sat_pixels:
-        return highest_sat_pixel(rgb_image)
-    
-    sum_red = 0
-    sum_green = 0
-    for pixel in high_sat_pixels:
-        sum_red+=pixel[0]
-        sum_green+=pixel[1]
-        
-    # use sum() instead of manually adding them up
-    avg_red = sum_red / len(high_sat_pixels)
-    avg_green = sum_green / len(high_sat_pixels)*0.8
-    return avg_red,avg_green
-def highest_sat_pixel(rgb_image):
-    '''
-    Finds the highest saturation pixels, and checks if it has a higher green
-    or a higher red content
-    '''
-    hsv = cv2.cvtColor(rgb_image,cv2.COLOR_RGB2HSV)
-    s = hsv[:,:,1]
-    
-    x,y = (np.unravel_index(np.argmax(s),s.shape))
-    if rgb_image[x,y,0] > rgb_image[x,y,1]*0.9:
-        return 1,0 #red has a higher content
-    return 0,1
-```
-
-# Test dataset
-接下来我们导入测试集来看看，上述方法的测试精度
-上述方法我们实现了：
-1.求平均的brightness
-2.求red及green的色彩饱和度
-有人或许会提出疑问，为啥没有进行yellow的判断，因此我们作出以下的改善
-reference [url](http://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_imgproc/py_colorspaces/py_colorspaces.html?highlight=cv2%20inrange)
-
-这里部分阈值，我们直接参考[WIKI](https://zh.wikipedia.org/wiki/HSL%E5%92%8CHSV%E8%89%B2%E5%BD%A9%E7%A9%BA%E9%97%B4)上的数据：
-![这里写图片描述](https://img-blog.csdn.net/20180515161322159?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTA2NjUyMTY=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
-```python
-def estimate_label(rgb_image,display=False):
-    '''
-    rgb_image:Standardized RGB image
-    '''
-    return red_green_yellow(rgb_image,display)
-def findNoneZero(rgb_image):
-    rows,cols,_ = rgb_image.shape
+def find_none_zero(rgb_image: np.ndarray) -> int:
+    """辅助函数，用于统计图像上的非空像素数"""
+    rows, cols, _ = rgb_image.shape
     counter = 0
     for row in range(rows):
         for col in range(cols):
-            pixels = rgb_image[row,col]
-            if sum(pixels)!=0:
-                counter = counter+1
+            pixels = rgb_image[row, col]
+            if sum(pixels) != 0:
+                counter = counter + 1
+
     return counter
-def red_green_yellow(rgb_image,display):
-    '''
-    Determines the red , green and yellow content in each image using HSV and experimentally
-    determined thresholds. Returns a Classification based on the values
-    '''
-    hsv = cv2.cvtColor(rgb_image,cv2.COLOR_RGB2HSV)
-    sum_saturation = np.sum(hsv[:,:,1])# Sum the brightness values
-    area = 32*32
-    avg_saturation = sum_saturation / area #find average
+```
+
+### 运行测试
+
+最后编写测试函数，将测试图片逐张传入算法函数，获得对应的预测标签，再与实际标签比对，得知算法是否准确。
+
+```python
+def get_misclassified_images(
+    test_images,
+) -> list[tuple[np.ndarray, TrafficLightColor, TrafficLightColor]]:
+    """
+    Constructs a list of misclassified images given a list of test images and their labels
+    :param test_images: 用于测试的图像集
+    :return: 分类错误的图像、预测标签、实际标签
+    """
     
-    sat_low = int(avg_saturation*1.3)#均值的1.3倍，工程经验
-    val_low = 140
-    #Green
-    lower_green = np.array([70,sat_low,val_low])
-    upper_green = np.array([100,255,255])
-    green_mask = cv2.inRange(hsv,lower_green,upper_green)
-    green_result = cv2.bitwise_and(rgb_image,rgb_image,mask = green_mask)
-    #Yellow
-    lower_yellow = np.array([10,sat_low,val_low])
-    upper_yellow = np.array([60,255,255])
-    yellow_mask = cv2.inRange(hsv,lower_yellow,upper_yellow)
-    yellow_result = cv2.bitwise_and(rgb_image,rgb_image,mask=yellow_mask)
-    
-    # Red 
-    lower_red = np.array([150,sat_low,val_low])
-    upper_red = np.array([180,255,255])
-    red_mask = cv2.inRange(hsv,lower_red,upper_red)
-    red_result = cv2.bitwise_and(rgb_image,rgb_image,mask = red_mask)
-    if display==True:
-        _,ax = plt.subplots(1,5,figsize=(20,10))
-        ax[0].set_title('rgb image')
-        ax[0].imshow(rgb_image)
-        ax[1].set_title('red result')
-        ax[1].imshow(red_result)
-        ax[2].set_title('yellow result')
-        ax[2].imshow(yellow_result)
-        ax[3].set_title('green result')
-        ax[3].imshow(green_result)
-        ax[4].set_title('hsv image')
-        ax[4].imshow(hsv)
-        plt.show()
-    sum_green = findNoneZero(green_result)
-    sum_red = findNoneZero(red_result)
-    sum_yellow = findNoneZero(yellow_result)
-    if sum_red >= sum_yellow and sum_red>=sum_green:
-        return [1,0,0]#Red
-    if sum_yellow>=sum_green:
-        return [0,1,0]#yellow
-    return [0,0,1]#green
-```
-
-# Test
-接下来我们选择三张图片来看看测试效果
-> img_red,img_yellow,img_green
-
-
-```python
-img_test = [(img_red,'red'),(img_yellow,'yellow'),(img_green,'green')]
-standardtest = standardize(img_test)
-
-for img in standardtest:
-    predicted_label = estimate_label(img[0],display = True)
-    print('Predict label :',predicted_label)
-    print('True label:',img[1])
-```
-
-
-![png](https://img-blog.csdn.net/201805151611003?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTA2NjUyMTY=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
-
-
-    Predict label : [1, 0, 0]
-    True label: [1, 0, 0]
-
-
-
-![png](https://img-blog.csdn.net/20180515161108821?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTA2NjUyMTY=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
-
-
-    Predict label : [0, 1, 0]
-    True label: [0, 1, 0]
-
-
-
-![png](https://img-blog.csdn.net/2018051516111618?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTA2NjUyMTY=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
-
-
-    Predict label : [0, 0, 1]
-    True label: [0, 0, 1]
-
-
-
-```python
-# Using the load_dataset function in helpers.py
-# Load test data
-TEST_IMAGE_LIST = load_dataset(IMAGE_DIR_TEST)
-
-# Standardize the test data
-STANDARDIZED_TEST_LIST = standardize(TEST_IMAGE_LIST)
-
-# Shuffle the standardized test data
-random.shuffle(STANDARDIZED_TEST_LIST)
-```
-
-    181
-    9
-    107
-
-
-# Determine the Accuracy
-接下来我们来看看咱们算法在测试集上的准确率。下面我们实现的代码存储所有的被错分的图片以及它们被预测的结果及真实标签。
-这些数据被存储在MISCLASSIFIED.
-
-
-
-```python
-# COnstructs a list of misclassfied iamges given a list of test images and their labels
-# This will throw an assertionerror if labels are not standardized(one hot encode)
-def get_misclassified_images(test_images,display=False):
     misclassified_images_labels = []
-    #Iterate through all the test images
-    #Classify each image  and compare to the true label
-    for image in test_images:
-        # Get true data
-        im = image[0]
-        true_label = image[1]
-        assert (len(true_label)==3),'This true_label is not the excepted length (3).'
-        
-        #Get predicted label from your classifier
-        predicted_label = estimate_label(im,display=False)
-        assert(len(predicted_label)==3),'This predicted_label is not the excepted length (3).'
-        
-        #compare true and predicted labels
-        if(predicted_label!=true_label):
-            #if these labels are ot equal, the image  has been misclassified
-            misclassified_images_labels.append((im,predicted_label,true_label))
-    # return the list of misclassified [image,predicted_label,true_label] values
+    
+    # 遍历所有测试图像，运行图像分类，对比预测标签与实际标签
+    for image_set in test_images:
+        image, true_label = image_set
+
+        # 执行分类算法，获取预测标签
+        predicted_label = traffic_light_classification(image)
+
+        if predicted_label != true_label:
+            # 若两种标签不匹配，则是分类错误
+            misclassified_images_labels.append((image, predicted_label, true_label))
+
     return misclassified_images_labels
-# Find all misclassified images in a given test set
-MISCLASSIFIED = get_misclassified_images(STANDARDIZED_TEST_LIST,display=False)
-#Accuracy calcuations
-total = len(STANDARDIZED_TEST_LIST)
-num_correct = total-len(MISCLASSIFIED)
+
+MISCLASSIFIED = get_misclassified_images(standardized_train_list)
+
+# 准确度计算
+total = len(standardized_train_list)
+num_correct = total - len(MISCLASSIFIED)
 accuracy = num_correct / total
-print('Accuracy:'+str(accuracy))
-print('Number of misclassfied images = '+str(len(MISCLASSIFIED))+' out of '+str(total))
+print(
+    f"Accuracy: {accuracy*100:.2f}%\n",
+    f"Number of misclassified images = {len(MISCLASSIFIED)} out of {total}",
+)
 ```
 
-    Accuracy:0.9797979797979798
-    Number of misclassfied images = 6 out of 297
+经测试，1187张图像中仅有21张分类错误，准确度为98.23%。
+
+### 可视化绘图
+
+还编写了数个可视化绘图函数，便于直观检查算法运行情况。
+
+```python
+"""
+可视化地验证算法各部分函数运行情况
+"""
+
+import cv2
+from config import *
+from constants import TrafficLightColor
+from hsv_process import apply_mask, get_avg_saturation
+from load_data import load_dataset
+from matplotlib import pyplot as plt
 
 
+def viz_load_data(image_list, red_index, yellow_index, green_index) -> None:
+    """
+    数据加载部分的可视化
+    """
+    _, ax = plt.subplots(1, 3, figsize=(5, 2))
+
+    # red
+    red_img = image_list[red_index][0]
+    ax[0].imshow(red_img)
+    ax[0].annotate(image_list[red_index][1].name, xy=(2, 5), color="red", fontsize="10")
+    ax[0].axis("off")
+    ax[0].set_title(red_img.shape, fontsize=10)
+
+    # yellow
+    yellow_img = image_list[yellow_index][0]
+    plt.imshow(yellow_img)
+    ax[1].imshow(yellow_img)
+    ax[1].annotate(
+        image_list[yellow_index][1].name, xy=(2, 5), color="yellow", fontsize="10"
+    )
+    ax[1].axis("off")
+    ax[1].set_title(yellow_img.shape, fontsize=10)
+
+    # green
+    green_img = image_list[green_index][0]
+    plt.imshow(green_img)
+    ax[2].imshow(green_img)
+    ax[2].annotate(
+        image_list[green_index][1].name, xy=(2, 5), color="green", fontsize="10"
+    )
+    ax[2].axis("off")
+    ax[2].set_title(green_img.shape, fontsize=10)
+    plt.show()
+
+
+def viz_hsv(image_list, image_num: int = 0) -> None:
+    """
+    将图像分解到hsv三通道的可视化
+    """
+
+    test_im, test_label = image_list[image_num]
+    # convert to hsv
+    hsv = cv2.cvtColor(test_im, cv2.COLOR_RGB2HSV)
+    # Print image label
+    h = hsv[:, :, 0]
+    s = hsv[:, :, 1]
+    v = hsv[:, :, 2]
+    # Plot the original image and the three channels
+    _, ax = plt.subplots(1, 4, figsize=(20, 10))
+    ax[0].set_title("Standardized image")
+    ax[0].imshow(test_im)
+    ax[1].set_title("H channel")
+    ax[1].imshow(h, cmap="gray")
+    ax[2].set_title("S channel")
+    ax[2].imshow(s, cmap="gray")
+    ax[3].set_title("V channel")
+    ax[3].imshow(v, cmap="gray")
+    plt.show()
+
+
+def viz_mask(rgb_image) -> None:
+    """
+    主算法中掩码作用后的可视化
+    """
+
+    hsv_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2HSV)
+
+    avg_saturation = get_avg_saturation(rgb_image)
+    sat_low = int(avg_saturation * SATURATION_LOWER_RATIO)
+    val_low = VALUE_LOWER
+
+    red_result = apply_mask(rgb_image, sat_low, val_low, RED_LOWER, RED_UPPER)
+    yellow_result = apply_mask(rgb_image, sat_low, val_low, YELLOW_LOWER, YELLOW_UPPER)
+    green_result = apply_mask(rgb_image, sat_low, val_low, GREEN_LOWER, GREEN_UPPER)
+
+    _, ax = plt.subplots(1, 4, figsize=(20, 10))
+    ax[0].set_title("rgb image")
+    ax[0].imshow(rgb_image)
+    ax[1].set_title("red result")
+    ax[1].imshow(red_result)
+    ax[2].set_title("yellow result")
+    ax[2].imshow(yellow_result)
+    ax[3].set_title("green result")
+    ax[3].imshow(green_result)
+    plt.show()
+
+
+if __name__ == "__main__":
+    IMAGE_LIST = load_dataset(IMAGE_DIR_TRAINING)
+    img_red = IMAGE_LIST[7][0]
+    img_yellow = IMAGE_LIST[730][0]
+    img_green = IMAGE_LIST[800][0]
+    img_test = [
+        (img_red, TrafficLightColor.RED),
+        (img_yellow, TrafficLightColor.YELLOW),
+        (img_green, TrafficLightColor.GREEN),
+    ]
+
+    viz_load_data(IMAGE_LIST, 7, 730, 800)
+    viz_hsv(IMAGE_LIST, 7)
+    for img in img_test:
+        viz_mask(img[0])
+
+```
+
+## 总结
+
+使用 OpenCV 进行图像处理，将图像转至 HSV 色彩空间，运用适当的掩膜提取出关注部分，比较关注部分非空像素值的个数，最终实现了交通信号灯识别分类算法。该算法实现简单，运算速度快，经简单调参后可以达到98%以上的正确率，效果较好。
+
+## 参考资料
+
+- [wiki - HSL and HSV](https://www.wikiwand.com/en/HSL%20and%20HSV)
