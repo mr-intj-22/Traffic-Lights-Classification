@@ -52,15 +52,6 @@ def apply_mask(
     return image_result
 
 
-def find_none_zero(rgb_image: np.ndarray) -> int:
-    """辅助函数"""
-    # TODO 通过numpy向量化重写此函数，提升性能
-    rows, cols, _ = rgb_image.shape
-    counter = 0
-    for row in range(rows):
-        for col in range(cols):
-            pixels = rgb_image[row, col]
-            if sum(pixels) != 0:
-                counter = counter + 1
-
-    return counter
+def find_none_zero(rgb_image) -> int:
+    """辅助函数，统计图像中非黑像素点个数"""
+    return int(np.sum(np.sum(rgb_image, axis=2) != 0))
