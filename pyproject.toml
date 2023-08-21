@@ -5,22 +5,26 @@ description = "基于OpenCV的红绿灯识别"
 authors = ["shawshany <victor.xsyang@gmail.com>","muzing <muzi2001@foxmail.com>"]
 readme = "README.md"
 
-# 使用清华pypi镜像
 [[tool.poetry.source]]
-name = "tsinghua"
+name = "tsinghua_mirror"  # 使用清华 PyPI 镜像
 url = "https://pypi.tuna.tsinghua.edu.cn/simple"
-default = true
+priority = "default"
+
+[[tool.poetry.source]]
+name = "PyPI"
+priority = "supplemental"
 
 [tool.poetry.dependencies]
 python = ">=3.9, <3.12"
 numpy = "^1.24.0"
-opencv-python = "~4.5.0.0"  # PyCharm 暂不支持更高版本的代码提示，很怪
+opencv-python = "^4.8.0.0"
 matplotlib = "^3.6.0"
 ipykernel = "^6.19.0"  # 运行.ipynb文件的最小依赖
 
 [tool.poetry.group.dev.dependencies]
 black = {extras = ["jupyter"], version = "^22.12.0"}
-isort = "^5.11.0"
+isort = "^5.12.0"
+pipreqs = "^0.4.13"
 
 [tool.black]
 line-length = 88
