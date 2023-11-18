@@ -11,85 +11,113 @@ from hsv_process import apply_mask, find_none_zero, get_avg_saturation
 from load_data import load_dataset
 from standardize import standardize_image
 
-# 加载数据
-IMAGE_LIST = load_dataset(IMAGE_DIR_TRAINING)
 
-# 标准化
-standardized_train_list = standardize_image(IMAGE_LIST, *STD_IMAGE_SIZE)
+class TrafficLightClassification():
+
+    def __init__(self) -> None:
+        self.SATURATION_LOWER_RATIO: float = 1.3  # 平均饱和度乘以此系数，作为饱和度下限，推荐值1.3
+        self.VALUE_LOWER: int = 140  # 明度下限
+        self.RED_LOWER: int = 150  # 红色色相下限
+        self.RED_UPPER: int = 180  # 红色色相上限
+        self.YELLOW_LOWER: int = 10  # 黄色色相下限
+        self.YELLOW_UPPER: int = 60  # 黄色色相上限
+        self.GREEN_LOWER: int = 70  # 绿色色相下限
+        self.GREEN_UPPER: int = 100  # 绿色色相上限
+
+    def traffic_light_classification(self, rgb_image: np.ndarray) -> TrafficLightColor:
+        """
+        算法主函数，返回输入的图像对应的信号灯颜色 \n
+        算法参数（变量名全大写）需要在配置文件中设置 \n
+        :param rgb_image: rgb空间下的单张图像数据
+        :return: 信号灯颜色（枚举值）
+        """
+
+        avg_saturation = get_avg_saturation(rgb_image)  # 平均饱和度
+        sat_low = int(avg_saturation * self.SATURATION_LOWER_RATIO)
+        val_low = self.VALUE_LOWER
+
+        red_result = apply_mask(rgb_image, sat_low, val_low, self.RED_LOWER, self.RED_UPPER)
+        yellow_result = apply_mask(rgb_image, sat_low, val_low, self.YELLOW_LOWER, self.YELLOW_UPPER)
+        green_result = apply_mask(rgb_image, sat_low, val_low, self.GREEN_LOWER, self.GREEN_UPPER)
+
+        # 统计经各色掩膜处理后，剩余的非空像素数量，最多者则认为是该类图像
+        sum_red = find_none_zero(red_result)
+        sum_yellow = find_none_zero(yellow_result)
+        sum_green = find_none_zero(green_result)
+        sum_max = max(sum_red, sum_yellow, sum_green)
+
+        if sum_max == 0:
+            # 灯光部分像素与周围像素太接近，识别失败
+            return TrafficLightColor.UNIDENTIFIED
+        elif sum_max == sum_red:
+            return TrafficLightColor.RED
+        elif sum_max == sum_yellow:
+            return TrafficLightColor.YELLOW
+        elif sum_max == sum_green:
+            return TrafficLightColor.GREEN
+        else:
+            return TrafficLightColor.UNIDENTIFIED
 
 
-def traffic_light_classification(rgb_image: np.ndarray) -> TrafficLightColor:
-    """
-    算法主函数，返回输入的图像对应的信号灯颜色 \n
-    算法参数（变量名全大写）需要在配置文件中设置 \n
-    :param rgb_image: rgb空间下的单张图像数据
-    :return: 信号灯颜色（枚举值）
-    """
+    def get_misclassified_images(
+            self,
+        test_images,
+    ) -> list[tuple[np.ndarray, TrafficLightColor, TrafficLightColor]]:
+        """
+        Constructs a list of misclassified images given a list of test images and their labels
+        :param test_images: 用于测试的图像集
+        :return: 分类错误的图像、预测标签、实际标签
+        """
 
-    avg_saturation = get_avg_saturation(rgb_image)  # 平均饱和度
-    sat_low = int(avg_saturation * SATURATION_LOWER_RATIO)
-    val_low = VALUE_LOWER
+        misclassified_images_labels = []
 
-    red_result = apply_mask(rgb_image, sat_low, val_low, RED_LOWER, RED_UPPER)
-    yellow_result = apply_mask(rgb_image, sat_low, val_low, YELLOW_LOWER, YELLOW_UPPER)
-    green_result = apply_mask(rgb_image, sat_low, val_low, GREEN_LOWER, GREEN_UPPER)
+        # 遍历所有测试图像，运行图像分类，对比预测标签与实际标签
+        for image_set in test_images:
+            image, true_label = image_set
 
-    # 统计经各色掩膜处理后，剩余的非空像素数量，最多者则认为是该类图像
-    sum_red = find_none_zero(red_result)
-    sum_yellow = find_none_zero(yellow_result)
-    sum_green = find_none_zero(green_result)
-    sum_max = max(sum_red, sum_yellow, sum_green)
+            # 执行分类算法，获取预测标签
+            predicted_label = self.traffic_light_classification(image)
 
-    if sum_max == 0:
-        # 灯光部分像素与周围像素太接近，识别失败
-        return TrafficLightColor.UNIDENTIFIED
-    elif sum_max == sum_red:
-        return TrafficLightColor.RED
-    elif sum_max == sum_yellow:
-        return TrafficLightColor.YELLOW
-    elif sum_max == sum_green:
-        return TrafficLightColor.GREEN
-    else:
-        return TrafficLightColor.UNIDENTIFIED
+            if predicted_label != true_label:
+                # 若两种标签不匹配，则是分类错误
+                misclassified_images_labels.append((image, predicted_label, true_label))
 
+        return misclassified_images_labels
 
-def get_misclassified_images(
-    test_images,
-) -> list[tuple[np.ndarray, TrafficLightColor, TrafficLightColor]]:
-    """
-    Constructs a list of misclassified images given a list of test images and their labels
-    :param test_images: 用于测试的图像集
-    :return: 分类错误的图像、预测标签、实际标签
-    """
+    def update_params(self, chromosome):
+        self.SATURATION_LOWER_RATIO = chromosome[0]
+        self.VALUE_LOWER= chromosome[1]
+        self.RED_LOWER = chromosome[2]
+        self.RED_UPPER = chromosome[3]
+        self.YELLOW_LOWER = chromosome[4]
+        self.YELLOW_UPPER = chromosome[5]
+        self.GREEN_LOWER = chromosome[6]
+        self.GREEN_UPPER = chromosome[7]
 
-    misclassified_images_labels = []
-
-    # 遍历所有测试图像，运行图像分类，对比预测标签与实际标签
-    for image_set in test_images:
-        image, true_label = image_set
-
-        # 执行分类算法，获取预测标签
-        predicted_label = traffic_light_classification(image)
-
-        if predicted_label != true_label:
-            # 若两种标签不匹配，则是分类错误
-            misclassified_images_labels.append((image, predicted_label, true_label))
-
-    return misclassified_images_labels
-
+    def classify(self, dataset, chromosome=[]):
+        if len(chromosome):
+            self.update_params(chromosome)
+        MISCLASSIFIED = self.get_misclassified_images(dataset)
+        total = len(dataset)
+        num_correct = total - len(MISCLASSIFIED)
+        accuracy = num_correct / total
+        return num_correct, len(MISCLASSIFIED), accuracy
 
 if __name__ == "__main__":
+    # 加载数据
+    IMAGE_LIST = load_dataset(IMAGE_DIR_TRAINING)
+    # 标准化
+    standardized_train_list = standardize_image(IMAGE_LIST, *STD_IMAGE_SIZE)
+    classifier = TrafficLightClassification()
+
     start = time.process_time_ns()
     # Find all misclassified images in a given test set
-    MISCLASSIFIED = get_misclassified_images(standardized_train_list)
+    num_correct, misclassified, accuracy =classifier.classify(standardized_train_list)
     end = time.process_time_ns()
     print("time = ", end - start)
 
     # 准确度计算
-    total = len(standardized_train_list)
-    num_correct = total - len(MISCLASSIFIED)
-    accuracy = num_correct / total
     print(
         f"Accuracy: {accuracy*100:.2f}%\n",
-        f"Number of misclassified images = {len(MISCLASSIFIED)} out of {total}",
+        f"Number of misclassified images = {misclassified} out of {misclassified+num_correct}",
     )
