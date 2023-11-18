@@ -11,7 +11,7 @@ def random_hue():
     return lower_limit, upper_limit
 
 def random_sv():
-    lower_saturation_limit_ratio = round(0.5+np.random.rand(),2)
+    lower_saturation_limit_ratio = round(0.5+np.random.rand(),3)
     lower_value_limit = np.random.randint(0,255)
     return lower_saturation_limit_ratio, lower_value_limit
 
@@ -47,8 +47,7 @@ def mutate(population):
     for chromosome in population:
         rand_mult = (np.random.rand()/5+0.9)
         chromosome = np.array(chromosome)*rand_mult
-        chromosome[1:] = chromosome[1:].astype(np.int16)
-        new_gens.append(chromosome.tolist())
+        new_gens.append([round(chromosome[0],3)] + chromosome[1:].astype(np.int16).tolist())
     return new_gens
 
 def fitness(classifier, dataset, chromosome):
@@ -58,24 +57,23 @@ def optimize(classifier, dataset, population_size, max_generations, min_fittness
     fittest_solution = ((0,0,0), [])
     population = random_population(population_size)
     offspring = []
-    try:
-        for i in tqdm.tqdm(range(max_generations), total=max_generations):
-            # evaluate current population
-            for j, chromosome in enumerate((pbar := (tqdm.tqdm(population, total=len(population))))):
-                pbar.set_description(f"Current Accuracy {round(fittest_solution[0][-1],4)}")
-                correct, missed, accuracy = fitness(classifier, dataset, chromosome)
-                if accuracy > fittest_solution[0][-1]:
-                    fittest_solution = ((correct, missed, accuracy), chromosome)
-                population[j] = (accuracy, chromosome)
-            population.sort(key= lambda c: c[0], reverse=True)
-            offspring = population[:4] + [population[i] for i in np.random.default_rng().choice(len(population)-4, size=4, replace=False)+4]
-            population = crossover(offspring)
-            population += crossover2(offspring)
-            population = mutate(population)
-            population += random_population(population_size-len(population))
-    except Exception as e:
-        print(e, chromosome, sep='\n')
-        print(fittest_solution)
+        
+    for i in tqdm.tqdm(range(max_generations), total=max_generations):
+        # evaluate current population
+        for j, chromosome in enumerate((pbar := (tqdm.tqdm(population, total=len(population))))):
+            pbar.set_description(f"Current Accuracy {round(fittest_solution[0][-1],4)}")
+            correct, missed, accuracy = fitness(classifier, dataset, chromosome)
+            if accuracy > fittest_solution[0][-1]:
+                fittest_solution = ((correct, missed, accuracy), chromosome)
+            population[j] = (accuracy, chromosome)
+        population.sort(key= lambda c: c[0], reverse=True)
+        offspring = population[:4] + [population[i] for i in np.random.default_rng().choice(len(population)-4, size=4, replace=False)+4]
+        population = crossover(offspring)
+        population += crossover2(offspring)
+        population += mutate(population)
+        population += random_population(population_size-len(population))
+
+    print(fittest_solution)
 
 if __name__ == '__main__':
     TRAIN_IMAGE_LIST = load_dataset(IMAGE_DIR_TRAINING)

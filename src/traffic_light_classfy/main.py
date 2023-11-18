@@ -15,14 +15,14 @@ from standardize import standardize_image
 class TrafficLightClassification():
 
     def __init__(self) -> None:
-        self.SATURATION_LOWER_RATIO: float = 1.3  # 平均饱和度乘以此系数，作为饱和度下限，推荐值1.3
-        self.VALUE_LOWER: int = 140  # 明度下限
-        self.RED_LOWER: int = 150  # 红色色相下限
-        self.RED_UPPER: int = 180  # 红色色相上限
-        self.YELLOW_LOWER: int = 10  # 黄色色相下限
-        self.YELLOW_UPPER: int = 60  # 黄色色相上限
-        self.GREEN_LOWER: int = 70  # 绿色色相下限
-        self.GREEN_UPPER: int = 100  # 绿色色相上限
+        self.SATURATION_LOWER_RATIO = SATURATION_LOWER_RATIO
+        self.VALUE_LOWER = VALUE_LOWER
+        self.RED_LOWER = RED_LOWER
+        self.RED_UPPER = RED_UPPER
+        self.YELLOW_LOWER = YELLOW_LOWER
+        self.YELLOW_UPPER = YELLOW_UPPER
+        self.GREEN_LOWER = GREEN_LOWER
+        self.GREEN_UPPER = GREEN_UPPER
 
     def traffic_light_classification(self, rgb_image: np.ndarray) -> TrafficLightColor:
         """
@@ -105,7 +105,7 @@ class TrafficLightClassification():
 
 if __name__ == "__main__":
     # 加载数据
-    IMAGE_LIST = load_dataset(IMAGE_DIR_TRAINING)
+    IMAGE_LIST = load_dataset(IMAGE_DIR_TEST)
     # 标准化
     standardized_train_list = standardize_image(IMAGE_LIST, *STD_IMAGE_SIZE)
     classifier = TrafficLightClassification()
