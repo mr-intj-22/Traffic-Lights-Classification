@@ -10,6 +10,7 @@ from constants import TrafficLightColor
 from hsv_process import apply_mask, find_none_zero, get_avg_saturation
 from load_data import load_dataset
 from standardize import standardize_image
+from visualize import viz_mask
 
 
 class TrafficLightClassification():
@@ -81,6 +82,7 @@ class TrafficLightClassification():
             if predicted_label != true_label:
                 # 若两种标签不匹配，则是分类错误
                 misclassified_images_labels.append((image, predicted_label, true_label))
+                viz_mask(image)
 
         return misclassified_images_labels
 
