@@ -42,15 +42,13 @@ def crossover2(offspring):
             new_gens.append(new_gen.astype(np.int16).tolist())
     return new_gens
 
-def mutate(offspring):
+def mutate(population):
     new_gens = []
-    for chromosome in offspring:
-        rand_mult = (np.random.rand()+0.5)
-        rand_gene = np.random.randint(len(offspring[0][1]))
-        if rand_gene == 0:
-            rand_mult /= 10
-        chromosome[1][rand_gene] *= rand_mult
-        new_gens.append(chromosome[1])
+    for chromosome in population:
+        rand_mult = (np.random.rand()/5+0.9)
+        chromosome = np.array(chromosome)*rand_mult
+        chromosome[1:] = chromosome[1:].astype(np.int16)
+        new_gens.append(chromosome.tolist())
     return new_gens
 
 def fitness(classifier, dataset, chromosome):
@@ -73,7 +71,7 @@ def optimize(classifier, dataset, population_size, max_generations, min_fittness
             offspring = population[:4] + [population[i] for i in np.random.default_rng().choice(len(population)-4, size=4, replace=False)+4]
             population = crossover(offspring)
             population += crossover2(offspring)
-            # population += mutate(offspring)
+            population = mutate(population)
             population += random_population(population_size-len(population))
     except Exception as e:
         print(e, chromosome, sep='\n')
