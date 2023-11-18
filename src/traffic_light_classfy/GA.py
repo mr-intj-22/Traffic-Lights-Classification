@@ -39,7 +39,7 @@ def crossover2(offspring):
     for i in range(len(offspring)-1):
         for j in range(i+1, len(offspring)):
             new_gen = (np.array(offspring[i][1])+np.array(offspring[j][1]))/2
-            new_gens.append(new_gen.tolist())
+            new_gens.append(new_gen.astype(np.int16).tolist())
     return new_gens
 
 def mutate(offspring):
@@ -75,7 +75,8 @@ def optimize(classifier, dataset, population_size, max_generations, min_fittness
             population += crossover2(offspring)
             # population += mutate(offspring)
             population += random_population(population_size-len(population))
-    except:
+    except Exception as e:
+        print(e, chromosome, sep='\n')
         print(fittest_solution)
 
 if __name__ == '__main__':
