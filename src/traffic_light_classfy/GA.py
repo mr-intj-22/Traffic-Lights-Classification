@@ -72,6 +72,7 @@ def optimize(classifier, dataset, population_size, max_generations, min_fittness
         population += crossover2(offspring)
         population += mutate(population)
         population += random_population(population_size-len(population))
+        print(fittest_solution)
 
     print(fittest_solution)
 
@@ -83,4 +84,4 @@ if __name__ == '__main__':
 
     classifier = TrafficLightClassification()
     
-    optimize(classifier, standardized_train_list, 300, int(100), min_fittness=0.99)
+    optimize(classifier, standardized_train_list, 1000, int(100), min_fittness=0.99)

@@ -82,7 +82,7 @@ class TrafficLightClassification():
             if predicted_label != true_label:
                 # 若两种标签不匹配，则是分类错误
                 misclassified_images_labels.append((image, predicted_label, true_label))
-                viz_mask(image)
+                # viz_mask(image)
 
         return misclassified_images_labels
 
@@ -107,7 +107,7 @@ class TrafficLightClassification():
 
 if __name__ == "__main__":
     # 加载数据
-    IMAGE_LIST = load_dataset(IMAGE_DIR_TEST)
+    IMAGE_LIST = load_dataset(IMAGE_DIR_TRAINING)
     # 标准化
     standardized_train_list = standardize_image(IMAGE_LIST, *STD_IMAGE_SIZE)
     classifier = TrafficLightClassification()
